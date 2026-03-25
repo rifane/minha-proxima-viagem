@@ -136,6 +136,32 @@ _FRASES_GENERICAS_ROTEIRO = {
     "finalize com uma refeicao tipica ou passeio leve em regiao movimentada e segura.",
 }
 
+_MARCADORES_BAIXA_CONFIANCA = {
+    "nao tenho certeza",
+    "não tenho certeza",
+    "nao sei",
+    "não sei",
+    "talvez",
+    "pode haver",
+    "podem ocorrer",
+    "sem informacao suficiente",
+    "sem informação suficiente",
+    "nao foi possivel confirmar",
+    "não foi possível confirmar",
+    "nao foi possivel obter",
+    "não foi possível obter",
+    "nao encontrei",
+    "não encontrei",
+    "indisponivel",
+    "indisponível",
+    "desconhecido",
+}
+
+_AVISO_BAIXA_CONFIANCA_DESTINO = (
+    "Não foi possível obter informações precisas sobre o local de destino com segurança. "
+    "Por isso, o plano foi colocado em modo conservador e deve ser validado em fontes oficiais antes da viagem."
+)
+
 
 class ServicoPlanejamentoViagem:
     def __init__(
@@ -166,8 +192,18 @@ class ServicoPlanejamentoViagem:
         prompt_usuario = construir_prompt_usuario(solicitacao)
         resposta = self.cliente_gemini.gerar_json(prompt_sistema, prompt_usuario)
         resposta_normalizada = self._normalizar_resposta(solicitacao, resposta)
+        modo_conservador = bool(resposta_normalizada.pop("__modo_conservador", False))
+        motivos_baixa_confianca = resposta_normalizada.pop("__motivos_baixa_confianca", [])
         plano = PlanoViagemGerado.model_validate(resposta_normalizada)
-        self._salvar_no_cache(solicitacao, plano)
+
+        if modo_conservador:
+            self.logger.warning(
+                "Plano em modo conservador para destino=%s motivos=%s",
+                solicitacao.destino,
+                ", ".join(str(motivo) for motivo in motivos_baixa_confianca) or "nao_informados",
+            )
+        else:
+            self._salvar_no_cache(solicitacao, plano)
 
         self.logger.info("Plano gerado com sucesso para %s", plano.destino)
         return plano
@@ -231,31 +267,32 @@ class ServicoPlanejamentoViagem:
         solicitacao: SolicitacaoPlanoViagem,
         resposta: dict[str, Any],
     ) -> dict[str, Any]:
-        metadados_resposta = resposta.get("__metadados_resposta") if isinstance(resposta, dict) else None
+        resposta_dict = resposta if isinstance(resposta, dict) else {}
+        metadados_resposta = resposta_dict.get("__metadados_resposta") if isinstance(resposta_dict, dict) else None
         roteiro = self._normalizar_roteiro(
             solicitacao,
-            resposta.get("roteiro_dia_a_dia") or resposta.get("roteiro") or [],
+            resposta_dict.get("roteiro_dia_a_dia") or resposta_dict.get("roteiro") or [],
         )
 
-        interesses = self._normalizar_interesses(solicitacao, resposta.get("interesses") or [])
+        interesses = self._normalizar_interesses(solicitacao, resposta_dict.get("interesses") or [])
         if not interesses:
             interesses = self._gerar_interesses_fallback(solicitacao)
 
         resposta_normalizada = {
-            "destino": resposta.get("destino") or solicitacao.destino,
-            "periodo_viagem": resposta.get("periodo_viagem") or solicitacao.periodo_formatado,
-            "total_dias": resposta.get("total_dias") or solicitacao.quantidade_dias,
-            "perfil_viajantes": resposta.get("perfil_viajantes") or solicitacao.perfil_viajantes,
+            "destino": resposta_dict.get("destino") or solicitacao.destino,
+            "periodo_viagem": resposta_dict.get("periodo_viagem") or solicitacao.periodo_formatado,
+            "total_dias": resposta_dict.get("total_dias") or solicitacao.quantidade_dias,
+            "perfil_viajantes": resposta_dict.get("perfil_viajantes") or solicitacao.perfil_viajantes,
             "resumo_historia": self._normalizar_grupo(
                 solicitacao,
-                resposta.get("resumo_historia"),
+                resposta_dict.get("resumo_historia"),
                 chave_grupo="historia",
                 titulo_padrao="Resumo histórico do destino",
                 resumo_padrao=f"Visão geral sobre a história e a identidade cultural de {solicitacao.destino}.",
             ),
             "contexto_periodo": self._normalizar_grupo(
                 solicitacao,
-                resposta.get("contexto_periodo"),
+                resposta_dict.get("contexto_periodo"),
                 chave_grupo="periodo",
                 titulo_padrao="Clima, eventos e contexto do período",
                 resumo_padrao=(
@@ -266,7 +303,7 @@ class ServicoPlanejamentoViagem:
             "interesses": interesses,
             "dicas_seguranca": self._normalizar_grupo(
                 solicitacao,
-                resposta.get("dicas_seguranca"),
+                resposta_dict.get("dicas_seguranca"),
                 chave_grupo="seguranca",
                 titulo_padrao="Segurança no destino",
                 resumo_padrao="Confirme condições locais, áreas recomendadas e cuidados gerais antes de cada passeio.",
@@ -274,19 +311,31 @@ class ServicoPlanejamentoViagem:
             "roteiro_dia_a_dia": roteiro,
             "observacoes_gerais": self._complementar_observacoes_gerais(
                 solicitacao,
-                self._normalizar_lista_textos(resposta.get("observacoes_gerais")),
+                self._normalizar_lista_textos(resposta_dict.get("observacoes_gerais")),
             ),
             "fontes_recomendadas": self._complementar_fontes_recomendadas(
                 solicitacao,
-                self._normalizar_lista_textos(resposta.get("fontes_recomendadas")),
+                self._normalizar_lista_textos(resposta_dict.get("fontes_recomendadas")),
             ),
             "modelo_utilizado": self._obter_metadado_resposta(metadados_resposta, "modelo_utilizado"),
             "familia_modelo": self._obter_metadado_resposta(metadados_resposta, "familia_modelo"),
             "nivel_detalhamento": solicitacao.nivel_detalhamento,
             "origem_cache": False,
-            "aviso_importante": resposta.get("aviso_importante")
+            "aviso_importante": resposta_dict.get("aviso_importante")
             or "Confirme preços, horários, clima e disponibilidade em canais oficiais antes da viagem.",
         }
+
+        motivos_baixa_confianca = self._identificar_motivos_baixa_confianca(
+            solicitacao,
+            resposta_dict,
+            resposta_normalizada,
+        )
+        if motivos_baixa_confianca:
+            return self._gerar_resposta_conservadora(
+                solicitacao,
+                metadados_resposta,
+                motivos_baixa_confianca,
+            )
 
         return resposta_normalizada
 
@@ -297,6 +346,342 @@ class ServicoPlanejamentoViagem:
             if isinstance(valor, str) and valor.strip():
                 return valor.strip()
         return None
+
+    def _identificar_motivos_baixa_confianca(
+        self,
+        solicitacao: SolicitacaoPlanoViagem,
+        resposta: dict[str, Any],
+        resposta_normalizada: dict[str, Any],
+    ) -> list[str]:
+        if not resposta:
+            return ["resposta_ausente_ou_invalida"]
+
+        motivos: list[str] = []
+        if self._destino_diverge_da_solicitacao(solicitacao, resposta.get("destino")):
+            motivos.append("destino_divergente")
+        if self._conteudo_esta_incompleto(resposta):
+            motivos.append("conteudo_insuficiente")
+        if self._roteiro_exige_modo_conservador(solicitacao, resposta, resposta_normalizada["roteiro_dia_a_dia"]):
+            motivos.append("roteiro_pouco_confiavel")
+
+        quantidade_sinais_incerteza = sum(
+            1
+            for texto in self._extrair_textos_resposta(resposta)
+            if self._texto_indica_baixa_confianca(texto)
+        )
+        if quantidade_sinais_incerteza >= 2:
+            motivos.append("sinais_textuais_de_incerteza")
+
+        return motivos
+
+    def _conteudo_esta_incompleto(self, resposta: dict[str, Any]) -> bool:
+        secoes_com_conteudo = 0
+        for campo in ("resumo_historia", "contexto_periodo", "dicas_seguranca"):
+            if self._grupo_tem_conteudo(resposta.get(campo)):
+                secoes_com_conteudo += 1
+
+        interesses = resposta.get("interesses")
+        if isinstance(interesses, list) and any(self._grupo_tem_conteudo(item) for item in interesses if isinstance(item, dict)):
+            secoes_com_conteudo += 1
+
+        roteiro = resposta.get("roteiro_dia_a_dia") or resposta.get("roteiro")
+        if isinstance(roteiro, list) and roteiro:
+            secoes_com_conteudo += 1
+
+        if self._normalizar_lista_textos(resposta.get("fontes_recomendadas")):
+            secoes_com_conteudo += 1
+
+        return secoes_com_conteudo < 3
+
+    def _grupo_tem_conteudo(self, valor: Any) -> bool:
+        if not isinstance(valor, dict):
+            return False
+        if self._normalizar_texto_curto(valor.get("resumo")):
+            return True
+        return bool(self._normalizar_lista_textos(valor.get("itens")))
+
+    def _roteiro_exige_modo_conservador(
+        self,
+        solicitacao: SolicitacaoPlanoViagem,
+        resposta: dict[str, Any],
+        roteiro_normalizado: list[dict[str, Any]],
+    ) -> bool:
+        roteiro_bruto = resposta.get("roteiro_dia_a_dia") or resposta.get("roteiro")
+        if not isinstance(roteiro_bruto, list) or not roteiro_bruto:
+            return True
+
+        total_dias = solicitacao.quantidade_dias
+        limite_dias_fallback = max(1, (total_dias * 3 + 3) // 4)
+        roteiro_minimo = self._gerar_roteiro_minimo(solicitacao)
+        dias_iguais_ao_fallback = sum(
+            1
+            for indice, dia in enumerate(roteiro_normalizado[:total_dias])
+            if self._gerar_assinatura_roteiro(dia) == self._gerar_assinatura_roteiro(roteiro_minimo[indice])
+        )
+
+        dias_com_conteudo_bruto = 0
+        assinaturas_brutas: set[str] = set()
+        for item in roteiro_bruto[:total_dias]:
+            if not isinstance(item, dict):
+                continue
+
+            campos_aproveitaveis = 0
+            if len(self._normalizar_texto_curto(item.get("tema_dia")).split()) >= 2:
+                campos_aproveitaveis += 1
+            for campo in ("manha", "tarde", "noite"):
+                if self._normalizar_texto_roteiro(item.get(campo)):
+                    campos_aproveitaveis += 1
+
+            if campos_aproveitaveis >= 2:
+                dias_com_conteudo_bruto += 1
+
+            assinatura = self._gerar_assinatura_roteiro(
+                {
+                    "tema_dia": self._normalizar_texto_curto(item.get("tema_dia")),
+                    "manha": self._normalizar_texto_roteiro(item.get("manha")),
+                    "tarde": self._normalizar_texto_roteiro(item.get("tarde")),
+                    "noite": self._normalizar_texto_roteiro(item.get("noite")),
+                }
+            )
+            if assinatura.strip(" |"):
+                assinaturas_brutas.add(assinatura)
+
+        minimo_dias_confiaveis = max(1, total_dias // 2)
+        if dias_com_conteudo_bruto < minimo_dias_confiaveis:
+            return True
+        if dias_iguais_ao_fallback >= limite_dias_fallback:
+            return True
+        if len(assinaturas_brutas) < minimo_dias_confiaveis:
+            return True
+        return False
+
+    def _destino_diverge_da_solicitacao(self, solicitacao: SolicitacaoPlanoViagem, destino_resposta: Any) -> bool:
+        destino_modelo = self._gerar_assinatura_texto(self._normalizar_texto_curto(destino_resposta))
+        if not destino_modelo:
+            return False
+
+        destino_solicitado = self._gerar_assinatura_texto(solicitacao.destino)
+        if destino_modelo == destino_solicitado:
+            return False
+        return destino_solicitado not in destino_modelo and destino_modelo not in destino_solicitado
+
+    def _extrair_textos_resposta(self, valor: Any) -> list[str]:
+        if isinstance(valor, str):
+            texto = self._normalizar_texto_curto(valor)
+            return [texto] if texto else []
+        if isinstance(valor, dict):
+            textos: list[str] = []
+            for item in valor.values():
+                textos.extend(self._extrair_textos_resposta(item))
+            return textos
+        if isinstance(valor, list):
+            textos: list[str] = []
+            for item in valor:
+                textos.extend(self._extrair_textos_resposta(item))
+            return textos
+        return []
+
+    def _texto_indica_baixa_confianca(self, texto: str) -> bool:
+        assinatura = self._gerar_assinatura_texto(texto)
+        return any(marcador in assinatura for marcador in _MARCADORES_BAIXA_CONFIANCA)
+
+    def _gerar_resposta_conservadora(
+        self,
+        solicitacao: SolicitacaoPlanoViagem,
+        metadados_resposta: Any,
+        motivos_baixa_confianca: list[str],
+    ) -> dict[str, Any]:
+        aviso = _AVISO_BAIXA_CONFIANCA_DESTINO
+        resumo_historia = self._gerar_grupo_conservador(
+            solicitacao,
+            titulo="Resumo histórico do destino",
+            resumo=(
+                f"Não foi possível obter informações históricas precisas sobre {solicitacao.destino} com segurança para este plano. "
+                "Use fontes institucionais ou culturais reconhecidas antes de assumir fatos, datas ou marcos específicos."
+            ),
+            itens_base=[
+                f"Consulte o portal oficial de turismo de {solicitacao.destino} e museus locais para obter um resumo histórico confiável.",
+                "Prefira materiais de instituições culturais, memoriais e centros de interpretação com curadoria reconhecida.",
+                "Evite tratar como confirmado qualquer marco histórico, evento ou influência cultural sem validação em fontes oficiais.",
+                "Se o destino tiver patrimônio tombado, verifique os canais institucionais responsáveis antes de montar visitas temáticas.",
+                "Ao usar conteúdo de blogs ou redes sociais, confirme se as informações históricas aparecem também em materiais institucionais.",
+            ],
+        )
+        contexto_periodo = self._gerar_grupo_conservador(
+            solicitacao,
+            titulo="Clima, eventos e contexto do período",
+            resumo=(
+                f"Não foi possível confirmar com precisão o contexto de {solicitacao.destino} para {solicitacao.periodo_formatado}. "
+                "Clima, eventos, movimento turístico e funcionamento de atrações devem ser checados mais perto da viagem."
+            ),
+            itens_base=[
+                "Verifique previsão do tempo, sensação térmica e alertas oficiais nos dias anteriores à viagem.",
+                "Consulte calendários culturais e agenda oficial do destino para confirmar se haverá eventos no período.",
+                "Cheque se a época coincide com alta temporada, feriados ou férias escolares que alterem preços e lotação.",
+                "Se depender de atrações ao ar livre, prepare alternativas cobertas em caso de chuva, vento ou calor intenso.",
+                "Confirme horários especiais, obras, interdições e necessidade de reserva diretamente com os atrativos envolvidos.",
+            ],
+        )
+        dicas_seguranca = self._gerar_grupo_conservador(
+            solicitacao,
+            titulo="Segurança no destino",
+            resumo=(
+                "Como não houve base confiável suficiente para detalhar o destino, mantenha a programação focada em áreas bem documentadas, "
+                "canais oficiais e deslocamentos previamente verificados."
+            ),
+            itens_base=[
+                "Prefira regiões centrais, turísticas ou amplamente documentadas em fontes oficiais e avaliações recentes.",
+                "Confirme rotas, horários de retorno e transporte antes de sair, especialmente à noite.",
+                "Monitore alertas de clima, mobilidade e segurança emitidos por órgãos oficiais do destino.",
+                "Mantenha documentos, telefone e meios de pagamento organizados e protegidos durante os passeios.",
+                "Só feche passeios, ingressos ou transfers após validar reputação, regras de cancelamento e canais de atendimento.",
+            ],
+        )
+
+        return {
+            "destino": solicitacao.destino,
+            "periodo_viagem": solicitacao.periodo_formatado,
+            "total_dias": solicitacao.quantidade_dias,
+            "perfil_viajantes": solicitacao.perfil_viajantes,
+            "resumo_historia": resumo_historia,
+            "contexto_periodo": contexto_periodo,
+            "interesses": self._gerar_interesses_conservadores(solicitacao),
+            "dicas_seguranca": dicas_seguranca,
+            "roteiro_dia_a_dia": self._gerar_roteiro_conservador(solicitacao),
+            "observacoes_gerais": self._complementar_observacoes_gerais(
+                solicitacao,
+                [
+                    aviso,
+                    "Use este retorno apenas como guia provisório até validar atrações, bairros, eventos e deslocamentos em fontes confiáveis.",
+                    "Evite assumir como confirmadas recomendações muito específicas que não apareçam em canais oficiais ou institucionais.",
+                ],
+            ),
+            "fontes_recomendadas": self._complementar_fontes_recomendadas(
+                solicitacao,
+                [
+                    f"Portal oficial de turismo de {solicitacao.destino}",
+                    "Secretaria de turismo, prefeitura ou órgão público equivalente do destino",
+                    "Serviços oficiais de meteorologia, mobilidade urbana e eventos locais",
+                ],
+            ),
+            "modelo_utilizado": self._obter_metadado_resposta(metadados_resposta, "modelo_utilizado"),
+            "familia_modelo": self._obter_metadado_resposta(metadados_resposta, "familia_modelo"),
+            "nivel_detalhamento": solicitacao.nivel_detalhamento,
+            "origem_cache": False,
+            "aviso_importante": aviso,
+            "__modo_conservador": True,
+            "__motivos_baixa_confianca": motivos_baixa_confianca,
+        }
+
+    def _gerar_grupo_conservador(
+        self,
+        solicitacao: SolicitacaoPlanoViagem,
+        *,
+        titulo: str,
+        resumo: str,
+        itens_base: list[str],
+    ) -> dict[str, Any]:
+        minimo_itens = obter_parametros_detalhamento(solicitacao.nivel_detalhamento)["itens_grupo"]
+        return {
+            "titulo": titulo,
+            "resumo": resumo,
+            "itens": self._complementar_lista([], itens_base, minimo_itens),
+        }
+
+    def _gerar_interesses_conservadores(self, solicitacao: SolicitacaoPlanoViagem) -> list[dict[str, Any]]:
+        interesses = solicitacao.interesses.selecionados or solicitacao.interesses.todos
+        parametros = obter_parametros_detalhamento(solicitacao.nivel_detalhamento)
+        minimo_itens = (
+            parametros["itens_interesse_sugestao"]
+            if not solicitacao.interesses.selecionados
+            else parametros["itens_interesse_selecionado"]
+        )
+
+        interesses_conservadores = []
+        for titulo in interesses:
+            itens_base = [
+                "Consulte fontes oficiais, canais institucionais ou guias reconhecidos antes de selecionar atrações desse perfil.",
+                "Só inclua paradas com endereço, funcionamento e logística confirmados perto da data da viagem.",
+                "Evite depender de listas genéricas sem confirmação local atualizada.",
+            ]
+            if titulo == "Gastronômico":
+                itens_base.append(
+                    "Para experiências gastronômicas, confirme cardápio, horário, reserva e reputação recente do estabelecimento antes da visita."
+                )
+            if titulo == "Vida noturna":
+                itens_base.append(
+                    "Para saídas noturnas, confirme segurança da região, transporte de volta e horários de encerramento no mesmo dia."
+                )
+            if titulo == "Econômico":
+                itens_base.append(
+                    "Compare atrações gratuitas, dias promocionais e rotas de transporte público em canais oficiais para decidir com melhor custo-benefício."
+                )
+
+            itens = self._complementar_lista(
+                [],
+                itens_base + self._gerar_itens_fallback_interesse(titulo, solicitacao),
+                minimo_itens,
+            )
+            interesses_conservadores.append(
+                {
+                    "titulo": titulo,
+                    "resumo": (
+                        f"Não foi possível confirmar sugestões precisas do perfil {titulo} para {solicitacao.destino}. "
+                        "Use esta seção como checklist de validação, e não como indicação já confirmada no destino."
+                    ),
+                    "itens": itens,
+                }
+            )
+
+        return interesses_conservadores
+
+    def _gerar_roteiro_conservador(self, solicitacao: SolicitacaoPlanoViagem) -> list[dict[str, Any]]:
+        temas_base = [
+            "Checagem inicial de informações confiáveis",
+            "Validação de atrações e deslocamentos",
+            "Seleção segura de experiências confirmadas",
+            "Plano flexível com alternativas verificadas",
+            "Revisão de clima, reservas e mobilidade",
+            "Encerramento com programação confirmada",
+        ]
+        manhas = [
+            "Na manhã do dia {dia}, consulte o portal oficial de turismo de {destino}, previsão do tempo e mobilidade para confirmar quais áreas e atrações estão realmente aptas para visita.",
+            "Use a primeira parte do dia {dia} para validar, em canais institucionais, endereços, necessidade de reserva e eventuais restrições do que pretende visitar em {destino}.",
+            "Comece o dia {dia} revisando somente opções com documentação clara, avaliação recente e funcionamento confirmado para {destino}.",
+        ]
+        tardes = [
+            "Depois de validar as informações do dia {dia}, concentre a programação apenas em atrações oficiais, centrais ou amplamente documentadas, evitando depender de recomendações não confirmadas.",
+            "Na tarde do dia {dia}, priorize experiências cujo acesso, deslocamento e tempo de visita possam ser checados com segurança no mesmo dia.",
+            "Se houver mais de uma alternativa viável para o dia {dia}, escolha a opção com melhor confirmação prática de funcionamento, logística e retorno.",
+        ]
+        noites = [
+            "Na noite do dia {dia}, mantenha o roteiro leve e reversível, escolhendo somente opções com funcionamento, retorno e segurança verificados no mesmo dia.",
+            "Feche o dia {dia} com uma programação simples e de fácil retorno, sem depender de horários, ingressos ou deslocamentos que não estejam claramente confirmados.",
+            "Para o período noturno do dia {dia}, prefira apenas regiões bem documentadas e com logística de volta definida antes de sair.",
+        ]
+        observacoes = [
+            "Como não foi possível obter informações precisas com segurança, confirme clima, deslocamento e funcionamento antes de sair.",
+            "Evite transformar sugestões genéricas em reserva ou compromisso firme sem validação em fontes oficiais.",
+            "Se houver crianças ou idosos, preserve pausas e só avance com atividades cuja logística esteja realmente clara.",
+        ]
+
+        roteiro = []
+        for indice in range(solicitacao.quantidade_dias):
+            data_atual = solicitacao.data_inicio + timedelta(days=indice)
+            tema_base = temas_base[indice % len(temas_base)]
+            roteiro.append(
+                {
+                    "dia": indice + 1,
+                    "data": data_atual.strftime("%d/%m/%Y"),
+                    "tema_dia": f"{tema_base} - dia {indice + 1}",
+                    "manha": manhas[indice % len(manhas)].format(dia=indice + 1, destino=solicitacao.destino),
+                    "tarde": tardes[indice % len(tardes)].format(dia=indice + 1, destino=solicitacao.destino),
+                    "noite": noites[indice % len(noites)].format(dia=indice + 1, destino=solicitacao.destino),
+                    "observacoes": observacoes[indice % len(observacoes)],
+                }
+            )
+
+        return roteiro
 
     def _normalizar_roteiro(
         self,

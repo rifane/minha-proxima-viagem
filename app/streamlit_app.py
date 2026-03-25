@@ -36,6 +36,8 @@ _MAPA_ICONES_INTERESSES = {
 
 _NIVEIS_DETALHAMENTO = ["enxuto", "equilibrado", "detalhado"]
 
+_MENSAGEM_MODO_CONSERVADOR = "não foi possível obter informações precisas sobre o local de destino"
+
 
 def aplicar_estilos() -> None:
     st.markdown(
@@ -294,6 +296,41 @@ def aplicar_estilos() -> None:
                 border-color: #fed7aa;
                 background: linear-gradient(90deg, #fff7ed 0%, #fffbeb 100%);
                 color: #9a3412;
+            }
+            .badge-meta.conservador {
+                border-color: #fcd34d;
+                background: linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%);
+                color: #92400e;
+            }
+            .banner-conservador {
+                background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 45%, #fef3c7 100%);
+                border: 1px solid #fdba74;
+                border-left: 6px solid #f59e0b;
+                border-radius: 18px;
+                padding: 1rem 1.1rem;
+                margin: 0.2rem 0 1rem 0;
+                box-shadow: 0 14px 28px rgba(245, 158, 11, 0.10);
+            }
+            .banner-conservador-topo {
+                display: flex;
+                align-items: center;
+                gap: 0.55rem;
+                margin-bottom: 0.4rem;
+                color: #92400e;
+                font-weight: 800;
+                font-size: 1rem;
+            }
+            .banner-conservador-texto {
+                color: #78350f;
+                line-height: 1.55;
+                font-size: 0.95rem;
+            }
+            .banner-conservador ul {
+                margin: 0.7rem 0 0 1.1rem;
+                color: #78350f;
+            }
+            .banner-conservador li {
+                margin-bottom: 0.28rem;
             }
             .linha-interesses {
                 display: flex;
@@ -653,6 +690,33 @@ def formatar_modelo_exibicao(plano: PlanoViagemGerado) -> str | None:
     return nome_curto
 
 
+def plano_em_modo_conservador(plano: PlanoViagemGerado) -> bool:
+    aviso = (plano.aviso_importante or "").strip().casefold()
+    return _MENSAGEM_MODO_CONSERVADOR in aviso
+
+
+def renderizar_banner_modo_conservador(plano: PlanoViagemGerado) -> None:
+    if not plano_em_modo_conservador(plano):
+        return
+
+    st.markdown(
+        f"""
+        <div class="banner-conservador">
+            <div class="banner-conservador-topo">⚠️ Plano em modo conservador</div>
+            <div class="banner-conservador-texto">
+                {escape(plano.aviso_importante)}
+                <ul>
+                    <li>Priorize atrações, bairros e deslocamentos confirmados em canais oficiais.</li>
+                    <li>Use este plano como guia provisório até validar clima, funcionamento e reservas.</li>
+                    <li>Evite assumir como confirmadas sugestões muito específicas sem checagem final.</li>
+                </ul>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def renderizar_metadados_resultado(plano: PlanoViagemGerado) -> None:
     badges: list[str] = []
     modelo_exibicao = formatar_modelo_exibicao(plano)
@@ -669,6 +733,9 @@ def renderizar_metadados_resultado(plano: PlanoViagemGerado) -> None:
         badges.append('<span class="badge-meta cache">⚡ Resultado vindo do cache</span>')
     else:
         badges.append('<span class="badge-meta ao-vivo">🌐 Consulta gerada ao vivo</span>')
+
+    if plano_em_modo_conservador(plano):
+        badges.append('<span class="badge-meta conservador">⚠️ Modo conservador</span>')
 
     st.markdown(f'<div class="linha-metadados">{"".join(badges)}</div>', unsafe_allow_html=True)
 
@@ -763,6 +830,7 @@ def renderizar_timeline_dia(dia: object) -> None:
 def renderizar_resultado(plano: PlanoViagemGerado) -> None:
     st.success("Planejamento gerado com sucesso!")
     renderizar_faixa_destaque_destino(plano)
+    renderizar_banner_modo_conservador(plano)
 
     st.markdown(
         f"""
