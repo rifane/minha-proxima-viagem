@@ -1,0 +1,55 @@
+# Ambiente e segredos
+.env
+.env.*
+!.env.example
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build / empacotamento
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs e arquivos temporários
+*.log
+logs/
+*.tmp
+*.temp
+
+# IDEs / editores
+.idea/
+.vscode/
+*.iml
+
+# Execução local / JetBrains / scripts
+.run/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
