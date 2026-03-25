@@ -8,10 +8,10 @@ sys.path.insert(0, str(ROOT))
 
 import streamlit as st
 
-from minha_proxima_viagem.cliente_api import instanciar_cliente_api_planejamento
-from minha_proxima_viagem.configuracao import obter_configuracao
-from minha_proxima_viagem.excecoes import ErroIntegracaoIA, ErroPlanejamentoViagem
-from minha_proxima_viagem.modelos import (
+from backend.minha_proxima_viagem.cliente_api import instanciar_cliente_api_planejamento
+from backend.minha_proxima_viagem.configuracao import obter_configuracao
+from backend.minha_proxima_viagem.excecoes import ErroIntegracaoIA, ErroPlanejamentoViagem
+from backend.minha_proxima_viagem.modelos import (
     InteressesViagem,
     PlanoViagemGerado,
     SolicitacaoPlanoViagem,

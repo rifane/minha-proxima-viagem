@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from minha_proxima_viagem.cliente_gemini import ClienteGemini
-from minha_proxima_viagem.configuracao import ConfiguracaoAplicacao
-from minha_proxima_viagem.excecoes import ErroIntegracaoIA
+from backend.minha_proxima_viagem.cliente_gemini import ClienteGemini
+from backend.minha_proxima_viagem.configuracao import ConfiguracaoAplicacao
+from backend.minha_proxima_viagem.excecoes import ErroIntegracaoIA
 
 
 @pytest.fixture

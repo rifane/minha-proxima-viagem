@@ -5,10 +5,10 @@ from pathlib import Path
 
 import google.generativeai as genai
 
-root_dir = Path(__file__).parent.parent
+root_dir = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root_dir))
 
-from minha_proxima_viagem.configuracao import obter_configuracao
+from backend.minha_proxima_viagem.configuracao import obter_configuracao
 
 
 def main() -> int:

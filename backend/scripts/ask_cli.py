@@ -5,11 +5,11 @@ import json
 import sys
 from pathlib import Path
 
-root_dir = Path(__file__).parent.parent
+root_dir = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root_dir))
 
-from minha_proxima_viagem.modelos import InteressesViagem, SolicitacaoPlanoViagem
-from minha_proxima_viagem.servico_planejamento import instanciar_servico_planejamento
+from backend.minha_proxima_viagem.modelos import InteressesViagem, SolicitacaoPlanoViagem
+from backend.minha_proxima_viagem.servico_planejamento import instanciar_servico_planejamento
 
 
 def criar_parser() -> argparse.ArgumentParser:

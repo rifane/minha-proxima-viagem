@@ -5,9 +5,9 @@ from typing import Any
 
 import httpx
 
-from minha_proxima_viagem.configuracao import ConfiguracaoAplicacao, obter_configuracao
-from minha_proxima_viagem.excecoes import ErroIntegracaoIA, ErroPlanejamentoViagem
-from minha_proxima_viagem.modelos import PlanoViagemGerado, SolicitacaoPlanoViagem
+from backend.minha_proxima_viagem.configuracao import ConfiguracaoAplicacao, obter_configuracao
+from backend.minha_proxima_viagem.excecoes import ErroIntegracaoIA, ErroPlanejamentoViagem
+from backend.minha_proxima_viagem.modelos import PlanoViagemGerado, SolicitacaoPlanoViagem
 
 
 class ClienteAPIPlanejamento:

@@ -7,16 +7,16 @@ from functools import lru_cache
 from time import monotonic
 from typing import Any
 
-from minha_proxima_viagem.cliente_gemini import ClienteGemini
-from minha_proxima_viagem.configuracao import ConfiguracaoAplicacao, obter_configuracao
-from minha_proxima_viagem.logs import obter_logger
-from minha_proxima_viagem.modelos import (
+from backend.minha_proxima_viagem.cliente_gemini import ClienteGemini
+from backend.minha_proxima_viagem.configuracao import ConfiguracaoAplicacao, obter_configuracao
+from backend.minha_proxima_viagem.logs import obter_logger
+from backend.minha_proxima_viagem.modelos import (
     GrupoConteudo,
     PlanoViagemGerado,
     SolicitacaoPlanoViagem,
     obter_parametros_detalhamento,
 )
-from minha_proxima_viagem.prompts import construir_prompt_usuario, obter_prompt_sistema
+from backend.minha_proxima_viagem.prompts import construir_prompt_usuario, obter_prompt_sistema
 
 
 _MAPA_INTERESSES_FALLBACK = {
@@ -136,14 +136,11 @@ _FRASES_GENERICAS_ROTEIRO = {
     "finalize com uma refeicao tipica ou passeio leve em regiao movimentada e segura.",
 }
 
-_MARCADORES_BAIXA_CONFIANCA = {
+_MARCADORES_BAIXA_CONFIANCA_FORTES = {
     "nao tenho certeza",
     "não tenho certeza",
     "nao sei",
     "não sei",
-    "talvez",
-    "pode haver",
-    "podem ocorrer",
     "sem informacao suficiente",
     "sem informação suficiente",
     "nao foi possivel confirmar",
@@ -155,6 +152,12 @@ _MARCADORES_BAIXA_CONFIANCA = {
     "indisponivel",
     "indisponível",
     "desconhecido",
+}
+
+_MARCADORES_BAIXA_CONFIANCA_MODERADOS = {
+    "talvez",
+    "pode haver",
+    "podem ocorrer",
 }
 
 _AVISO_BAIXA_CONFIANCA_DESTINO = (
@@ -357,22 +360,39 @@ class ServicoPlanejamentoViagem:
             return ["resposta_ausente_ou_invalida"]
 
         motivos: list[str] = []
+        motivos_estruturais: list[str] = []
         if self._destino_diverge_da_solicitacao(solicitacao, resposta.get("destino")):
             motivos.append("destino_divergente")
         if self._conteudo_esta_incompleto(resposta):
-            motivos.append("conteudo_insuficiente")
+            motivos_estruturais.append("conteudo_insuficiente")
         if self._roteiro_exige_modo_conservador(solicitacao, resposta, resposta_normalizada["roteiro_dia_a_dia"]):
-            motivos.append("roteiro_pouco_confiavel")
+            motivos_estruturais.append("roteiro_pouco_confiavel")
 
-        quantidade_sinais_incerteza = sum(
-            1
-            for texto in self._extrair_textos_resposta(resposta)
-            if self._texto_indica_baixa_confianca(texto)
-        )
-        if quantidade_sinais_incerteza >= 2:
+        quantidade_sinais_fortes, quantidade_sinais_moderados = self._contar_sinais_incerteza(resposta)
+        ha_incerteza_relevante = False
+        if quantidade_sinais_fortes >= 2:
+            ha_incerteza_relevante = True
+        elif quantidade_sinais_fortes >= 1 and motivos_estruturais:
+            ha_incerteza_relevante = True
+        elif quantidade_sinais_moderados >= 3 and len(motivos_estruturais) >= 2:
+            ha_incerteza_relevante = True
+
+        if ha_incerteza_relevante:
             motivos.append("sinais_textuais_de_incerteza")
 
-        return motivos
+        if "destino_divergente" in motivos:
+            motivos.extend(motivo for motivo in motivos_estruturais if motivo not in motivos)
+            return motivos
+
+        if len(motivos_estruturais) >= 2:
+            motivos.extend(motivo for motivo in motivos_estruturais if motivo not in motivos)
+            return motivos
+
+        if motivos_estruturais and ha_incerteza_relevante:
+            motivos.extend(motivo for motivo in motivos_estruturais if motivo not in motivos)
+            return motivos
+
+        return []
 
     def _conteudo_esta_incompleto(self, resposta: dict[str, Any]) -> bool:
         secoes_com_conteudo = 0
@@ -481,9 +501,23 @@ class ServicoPlanejamentoViagem:
             return textos
         return []
 
+    def _contar_sinais_incerteza(self, valor: Any) -> tuple[int, int]:
+        sinais_fortes = 0
+        sinais_moderados = 0
+        for texto in self._extrair_textos_resposta(valor):
+            assinatura = self._gerar_assinatura_texto(texto)
+            if any(marcador in assinatura for marcador in _MARCADORES_BAIXA_CONFIANCA_FORTES):
+                sinais_fortes += 1
+                continue
+            if any(marcador in assinatura for marcador in _MARCADORES_BAIXA_CONFIANCA_MODERADOS):
+                sinais_moderados += 1
+        return sinais_fortes, sinais_moderados
+
     def _texto_indica_baixa_confianca(self, texto: str) -> bool:
         assinatura = self._gerar_assinatura_texto(texto)
-        return any(marcador in assinatura for marcador in _MARCADORES_BAIXA_CONFIANCA)
+        return any(marcador in assinatura for marcador in _MARCADORES_BAIXA_CONFIANCA_FORTES) or any(
+            marcador in assinatura for marcador in _MARCADORES_BAIXA_CONFIANCA_MODERADOS
+        )
 
     def _gerar_resposta_conservadora(
         self,

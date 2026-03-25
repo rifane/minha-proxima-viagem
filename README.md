@@ -53,22 +53,26 @@ As versões abaixo refletem o estado atual do projeto e do arquivo `requirements
 
 ```text
 minha-proxima-viagem/
-├── app/
-│   ├── api.py                         # API FastAPI
+├── frontend/
 │   └── streamlit_app.py               # Frontend Streamlit
-├── minha_proxima_viagem/
-│   ├── __init__.py
-│   ├── cliente_gemini.py              # Integração com Gemini
-│   ├── configuracao.py                # Configuração centralizada via .env
-│   ├── excecoes.py                    # Exceções da aplicação
-│   ├── logs.py                        # Logging centralizado
-│   ├── modelos.py                     # Modelos Pydantic e regras de validação
-│   ├── prompts.py                     # Prompt dinâmico conforme interesses
-│   └── servico_planejamento.py        # Orquestração da geração do plano
-├── scripts/
-│   ├── ask_cli.py                     # Geração via terminal
-│   ├── list_models.py                 # Lista modelos disponíveis no Gemini
-│   └── quick_eval.py                  # Smoke test local sem chamada externa real
+├── backend/
+│   ├── app/
+│   │   └── api.py                     # API FastAPI
+│   ├── minha_proxima_viagem/
+│   │   ├── __init__.py
+│   │   ├── cliente_api.py             # Cliente HTTP usado pelo frontend
+│   │   ├── cliente_gemini.py          # Integração com Gemini
+│   │   ├── configuracao.py            # Configuração centralizada via .env
+│   │   ├── excecoes.py                # Exceções da aplicação
+│   │   ├── logs.py                    # Logging centralizado
+│   │   ├── modelos.py                 # Modelos Pydantic e regras de validação
+│   │   ├── prompts.py                 # Prompt dinâmico conforme interesses
+│   │   └── servico_planejamento.py    # Orquestração da geração do plano
+│   └── scripts/
+│       ├── ask_cli.py                 # Geração via terminal
+│       ├── list_models.py             # Lista modelos disponíveis no Gemini
+│       └── quick_eval.py              # Smoke test local sem chamada externa real
+├── tests/
 ├── .env.example
 ├── requirements.txt
 └── README.md
@@ -179,19 +183,19 @@ O frontend consome a API FastAPI via HTTP. Por isso, inicie primeiro o backend e
 1. Inicie a API:
 
 ```powershell
-uvicorn app.api:app --reload
+uvicorn backend.app.api:app --reload
 ```
 
 2. Em outro terminal, inicie o frontend:
 
 ```powershell
-streamlit run app/streamlit_app.py
+streamlit run frontend/streamlit_app.py
 ```
 
 ### API FastAPI
 
 ```powershell
-uvicorn app.api:app --reload
+uvicorn backend.app.api:app --reload
 ```
 
 Documentação interativa da API:
@@ -204,13 +208,13 @@ Documentação interativa da API:
 ### Uso via terminal
 
 ```powershell
-python scripts/ask_cli.py --data-inicio 2026-07-10 --data-fim 2026-07-14 --destino "Lisboa, Portugal" --adultos 2 --gastronomico --cultural --nivel-detalhamento detalhado
+python backend/scripts/ask_cli.py --data-inicio 2026-07-10 --data-fim 2026-07-14 --destino "Lisboa, Portugal" --adultos 2 --gastronomico --cultural --nivel-detalhamento detalhado
 ```
 
 ### Diagnóstico real dos modelos Gemini
 
 ```powershell
-python scripts/testar_modelos_gemini.py
+python backend/scripts/testar_modelos_gemini.py
 ```
 
 Esse script faz chamadas reais mínimas com baixo consumo de tokens para ajudar a identificar quais modelos estão utilizáveis para a sua chave/projeto no momento.
@@ -304,7 +308,7 @@ Foi incluído um smoke test que não depende de chamada real à API do Gemini.
 Execute:
 
 ```powershell
-python scripts/quick_eval.py
+python backend/scripts/quick_eval.py
 ```
 
 Esse script valida:

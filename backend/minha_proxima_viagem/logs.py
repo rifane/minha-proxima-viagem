@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from minha_proxima_viagem.configuracao import obter_configuracao
+from backend.minha_proxima_viagem.configuracao import obter_configuracao
 
 
 _FORMATO_LOG = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"

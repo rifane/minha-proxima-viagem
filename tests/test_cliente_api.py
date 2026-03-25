@@ -6,10 +6,10 @@ from datetime import date
 import httpx
 import pytest
 
-from minha_proxima_viagem.cliente_api import ClienteAPIPlanejamento
-from minha_proxima_viagem.configuracao import ConfiguracaoAplicacao
-from minha_proxima_viagem.excecoes import ErroPlanejamentoViagem
-from minha_proxima_viagem.modelos import InteressesViagem, PlanoViagemGerado, SolicitacaoPlanoViagem
+from backend.minha_proxima_viagem.cliente_api import ClienteAPIPlanejamento
+from backend.minha_proxima_viagem.configuracao import ConfiguracaoAplicacao
+from backend.minha_proxima_viagem.excecoes import ErroPlanejamentoViagem
+from backend.minha_proxima_viagem.modelos import InteressesViagem, PlanoViagemGerado, SolicitacaoPlanoViagem
 
 
 @pytest.fixture

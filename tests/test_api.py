@@ -7,8 +7,8 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api import app
-from minha_proxima_viagem.modelos import SolicitacaoPlanoViagem
+from backend.app.api import app
+from backend.minha_proxima_viagem.modelos import SolicitacaoPlanoViagem
 
 
 class ServicoPlanejamentoFake:

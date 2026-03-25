@@ -27,9 +27,9 @@ def _sanitizar_texto_json(texto: str) -> str:
     texto_limpo = texto_limpo.replace("\ufeff", "")
     return texto_limpo
 
-from minha_proxima_viagem.configuracao import ConfiguracaoAplicacao, obter_configuracao
-from minha_proxima_viagem.excecoes import ErroIntegracaoIA
-from minha_proxima_viagem.logs import obter_logger
+from backend.minha_proxima_viagem.configuracao import ConfiguracaoAplicacao, obter_configuracao
+from backend.minha_proxima_viagem.excecoes import ErroIntegracaoIA
+from backend.minha_proxima_viagem.logs import obter_logger
 
 
 class ClienteGemini:

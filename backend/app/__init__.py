@@ -1,0 +1,2 @@
+"""Entrypoints HTTP do backend."""
+

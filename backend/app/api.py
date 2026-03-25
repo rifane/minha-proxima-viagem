@@ -9,14 +9,14 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 
-root_dir = Path(__file__).parent.parent
+root_dir = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root_dir))
 
-from minha_proxima_viagem.configuracao import obter_configuracao
-from minha_proxima_viagem.excecoes import ErroIntegracaoIA, ErroPlanejamentoViagem
-from minha_proxima_viagem.logs import configurar_logs, obter_logger
-from minha_proxima_viagem.modelos import PlanoViagemGerado, SolicitacaoPlanoViagem
-from minha_proxima_viagem.servico_planejamento import instanciar_servico_planejamento
+from backend.minha_proxima_viagem.configuracao import obter_configuracao
+from backend.minha_proxima_viagem.excecoes import ErroIntegracaoIA, ErroPlanejamentoViagem
+from backend.minha_proxima_viagem.logs import configurar_logs, obter_logger
+from backend.minha_proxima_viagem.modelos import PlanoViagemGerado, SolicitacaoPlanoViagem
+from backend.minha_proxima_viagem.servico_planejamento import instanciar_servico_planejamento
 
 
 configurar_logs()

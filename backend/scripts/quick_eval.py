@@ -4,21 +4,21 @@ import sys
 from datetime import date
 from pathlib import Path
 
-root_dir = Path(__file__).parent.parent
+root_dir = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root_dir))
 
 from pydantic import ValidationError
 
-from minha_proxima_viagem.cliente_gemini import ClienteGemini
-from minha_proxima_viagem.configuracao import ConfiguracaoAplicacao
-from minha_proxima_viagem.excecoes import ErroIntegracaoIA
-from minha_proxima_viagem.modelos import (
+from backend.minha_proxima_viagem.cliente_gemini import ClienteGemini
+from backend.minha_proxima_viagem.configuracao import ConfiguracaoAplicacao
+from backend.minha_proxima_viagem.excecoes import ErroIntegracaoIA
+from backend.minha_proxima_viagem.modelos import (
     InteressesViagem,
     SolicitacaoPlanoViagem,
     normalizar_nivel_detalhamento,
 )
-from minha_proxima_viagem.prompts import construir_prompt_usuario
-from minha_proxima_viagem.servico_planejamento import ServicoPlanejamentoViagem
+from backend.minha_proxima_viagem.prompts import construir_prompt_usuario
+from backend.minha_proxima_viagem.servico_planejamento import ServicoPlanejamentoViagem
 
 
 class ClienteGeminiFake(ClienteGemini):

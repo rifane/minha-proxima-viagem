@@ -7,7 +7,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from minha_proxima_viagem.modelos import normalizar_nivel_detalhamento
+from backend.minha_proxima_viagem.modelos import normalizar_nivel_detalhamento
 
 
 load_dotenv()

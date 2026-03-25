@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from minha_proxima_viagem.modelos import SolicitacaoPlanoViagem, obter_parametros_detalhamento
+from backend.minha_proxima_viagem.modelos import SolicitacaoPlanoViagem, obter_parametros_detalhamento
 
 
 _PROMPT_SISTEMA = """

@@ -118,7 +118,7 @@ fi
 export APP_API_BACKEND_URL="$BACKEND_URL"
 
 echo "Iniciando backend em $BACKEND_URL ..."
-python -m uvicorn app.api:app --host "$BACKEND_HOST" --port "$BACKEND_PORT" --reload >"$BACKEND_LOG" 2>&1 &
+python -m uvicorn backend.app.api:app --host "$BACKEND_HOST" --port "$BACKEND_PORT" --reload >"$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 
 echo "Aguardando backend ficar disponível..."
@@ -136,5 +136,5 @@ echo "Abrindo frontend Streamlit em $FRONTEND_URL ..."
 echo "Pressione Ctrl+C para encerrar frontend e backend juntos."
 echo
 
-python -m streamlit run app/streamlit_app.py --server.address "$FRONTEND_HOST" --server.port "$FRONTEND_PORT"
+python -m streamlit run frontend/streamlit_app.py --server.address "$FRONTEND_HOST" --server.port "$FRONTEND_PORT"
 
