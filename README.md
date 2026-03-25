@@ -143,6 +143,35 @@ Se quiser um comportamento mais conservador, você ainda pode reduzir esses valo
 
 ## Como executar
 
+### Script único para Git Bash
+
+Se você quiser subir backend e frontend de uma vez só no Windows usando Git Bash, execute na raiz do projeto:
+
+```bash
+bash iniciar_app.sh
+```
+
+O script:
+
+- cria a `.venv` automaticamente caso ela ainda não exista;
+- ativa o ambiente virtual;
+- instala `requirements.txt` se estiver faltando alguma dependência principal;
+- garante `APP_API_BACKEND_URL=http://127.0.0.1:8000` para alinhar frontend e backend durante a execução;
+- inicia o backend FastAPI e espera o endpoint `/health` responder;
+- inicia o frontend Streamlit em seguida;
+- encerra o backend automaticamente quando você pressionar `Ctrl+C`.
+
+Portas padrão do script:
+
+- backend: `127.0.0.1:8000`
+- frontend: `127.0.0.1:8501`
+
+Se quiser customizar, você pode exportar variáveis antes de executar:
+
+```bash
+APP_BACKEND_PORT=8001 APP_FRONTEND_PORT=8502 bash iniciar_app.sh
+```
+
 ### Frontend Streamlit
 
 O frontend consome a API FastAPI via HTTP. Por isso, inicie primeiro o backend e depois o Streamlit.
